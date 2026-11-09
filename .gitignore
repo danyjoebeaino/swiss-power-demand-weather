@@ -1,0 +1,31 @@
+# ===== AnSeqDa – files and folders NOT pushed to GitHub =====
+
+# --- Raw data (~450 MB, no longer needed; re-downloadable from Swissgrid / MeteoSwiss) ---
+data/raw/
+
+# --- Large intermediate file (uncomment if it is > 50 MB: check with `du -h data/processed/*`) ---
+# data/processed/swissgrid_15min_raw.csv
+
+# --- Python virtual environment (each person creates their own from requirements.txt) ---
+.venv/
+venv/
+
+# --- Jupyter autosave copies ---
+.ipynb_checkpoints/
+
+# --- Python cache ---
+__pycache__/
+*.pyc
+
+# --- Archives (e.g. the zip made for uploading samples) ---
+*.zip
+
+# --- Excel lock files (created while a file is open) ---
+~$*
+.~lock.*
+
+# --- Operating system / editor clutter ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
