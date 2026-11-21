@@ -16,7 +16,7 @@
 | 4. Smoothing (Holt-Winters) + baselines | ✅ complete (21 Nov) – HW test MAE 4.05 GWh (2.85 %) | `06_baselines_holtwinters.ipynb` |
 | 5. ARIMA (SARIMA / SARIMAX) | ✅ complete (21 Nov) – best model test MAE 2.51 GWh (1.75 %) | `07_sarima.ipynb` |
 | 6. LSTM | ✅ complete (22 Nov) – ensemble test MAE 3.19 (does not beat SARIMAX + HDD 2.50) | `08_lstm.ipynb` |
-| 7. Comparison & conclusion | ⏭ next – leaderboard ready in `results/scores.csv` | `09_comparison.ipynb` (to create) |
+| 7. Comparison & conclusion | ⏭ **in progress – Danyjoe** (from 22 Nov) | `09_comparison.ipynb` |
 
 ### Team and repository
 - GitHub repo: **https://github.com/danyjoebeaino/swiss-power-demand-weather** (MIT license; private until grading, then public for portfolio).
@@ -487,6 +487,7 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 34. **SARIMA order = (1,0,0)(0,1,1)₇** (best validation MAE 3.51; matches lesson 18; simplest). Exogenous variables enter on weekdays only (a holiday on a Sunday changes nothing).
 33. **Holt-Winters variant = no trend** (additive, s = 7): trend and damped trend give identical scores with β ≈ 0 → simplest model kept (parsimony).
 35. **LSTM design (22 Nov):** PyTorch (CPU); day-ahead; **target = weekly difference y(t) − y(t−7)** (same idea as D = 1 → immune to the 2022–23 level shift), forecast = y(t−7) + prediction; two inputs: (a) window of the past 28 days [weekly diff, hdd, holiday_wd, christmas_wd, bridge_day] → LSTM, (b) known features of day t [hdd, calendar, weekday one-hot, Fourier] → dense; scaling fitted on train only; same split, metrics and `results/scores.csv`.
+36. **Test predictions saved to files** (`results/pred_06_holtwinters.csv`, `pred_07_sarimax.csv`, `pred_08_lstm.csv`) so the comparison notebook needs no retraining.
 26. **Collaboration:** GitHub repo, one branch per person, pull requests into `main`, one notebook per person at a time. Repo private until grading, then public (MIT license, data sources credited).
 
 ---
