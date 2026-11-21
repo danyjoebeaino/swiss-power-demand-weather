@@ -1,0 +1,11 @@
+model,MAE,RMSE,MAPE (%),period
+naive (yesterday),9.304,12.982,6.601,validation 2023
+seasonal naive (last week),7.977,10.744,5.374,validation 2023
+yearly naive (52 weeks ago),8.968,11.376,6.261,validation 2023
+Holt-Winters (no trend),3.584,5.276,2.499,validation 2023
+Holt-Winters (trend),3.59,5.285,2.504,validation 2023
+Holt-Winters (damped trend),3.585,5.276,2.5,validation 2023
+naive (yesterday),9.586,13.083,6.827,test 2024–2025
+seasonal naive (last week),7.745,10.846,5.243,test 2024–2025
+yearly naive (52 weeks ago),7.562,10.393,5.117,test 2024–2025
+Holt-Winters (no trend),4.054,5.76,2.847,test 2024–2025

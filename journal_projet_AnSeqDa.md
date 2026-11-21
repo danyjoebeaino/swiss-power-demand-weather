@@ -1,6 +1,6 @@
 # Project log – AnSeqDa (Analysis of Sequential Data)
 
-*Record of everything decided, done and found so far. Last update: 21 November 2026 – feature engineering COMPLETE (Danyjoe): `dataset_features.csv` saved (6,209 × 22); HDD base = 16.5 °C; forecasting task fixed = day-ahead; Youssef takes baselines + Holt-Winters.*
+*Record of everything decided, done and found so far. Last update: 21 November 2026 – section 4 COMPLETE: Holt-Winters test MAE 4.05 GWh / 2.85 % (seasonal naive 7.75); next = section 5 SARIMA → SARIMAX; feature engineering COMPLETE: `dataset_features.csv` saved (6,209 × 22); HDD base = 16.5 °C; forecasting task fixed = day-ahead; Youssef takes baselines + Holt-Winters.*
 
 ---
 
@@ -13,8 +13,8 @@
 | 2. Exploration | ✅ complete | `03_exploration.ipynb` |
 | 3. Autocorrelation & stationarity | ✅ complete (17 Nov) | `04_stationarity.ipynb` |
 | – Feature engineering | ✅ complete (21 Nov) | `05_features.ipynb` → `dataset_features.csv` |
-| 4. Smoothing (Holt-Winters) + baselines | ⏭ **next – Youssef** (branch `joe`) | `06_baselines_holtwinters.ipynb` (to create) |
-| 5. ARIMA (SARIMA / SARIMAX) | ⏭ **next – Danyjoe** | `07_sarima.ipynb` (to create) |
+| 4. Smoothing (Holt-Winters) + baselines | ✅ complete (21 Nov) – HW test MAE 4.05 GWh (2.85 %) | `06_baselines_holtwinters.ipynb` |
+| 5. ARIMA (SARIMA / SARIMAX) | ⬜ owner to agree (Youssef or Danyjoe) | `07_sarima.ipynb` (to create) |
 | 6. LSTM | ⬜ | – |
 | 7. Comparison & conclusion | ⬜ | – |
 
@@ -42,8 +42,8 @@
 8. **Forecasting task = day-ahead:** predict tomorrow with data up to today; evaluated over all of 2023 (validation) and 2024–2025 (test). **No leakage:** only inputs known before the forecast day (calendar, temperature of the day, consumption lags; rolling means must end yesterday).
 
 ### Immediate next steps
-- Danyjoe: commit + PR `05_features.ipynb` and `dataset_features.csv` into `main`; then `07_sarima.ipynb` (SARIMA(1,0,0)(0,1,1)₇ + neighbours by AIC → + Fourier → SARIMAX with HDD, holidays, Christmas period, bridge days).
-- Youssef: `06_baselines_holtwinters.ipynb` (naive, seasonal naive, yearly naive t−364, then Holt-Winters) → plan in section 14.
+- Danyjoe: commit + PR notebook 06 and `results/scores.csv`; then section 5 (`07_sarima.ipynb`) unless Youssef takes it. **Bar to beat on test: HW MAE 4.05 GWh, MAPE 2.85 %.**
+- Youssef: task to agree – `07_sarima.ipynb` (SARIMA → SARIMAX) or `08_lstm.ipynb`. Youssef does not edit the journal; his findings go in his notebook summary and are merged into the journal by Danyjoe.
 
 ---
 
@@ -364,6 +364,16 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 
 ---
 
+## 7f. Baselines and Holt-Winters (notebook `06_baselines_holtwinters.ipynb`, from 21 November, Danyjoe)
+
+| Lesson | What we did | Result |
+|---|---|---|
+| 23 | `evaluate()` (MAE, RMSE, MAPE) + `log_scores()` → `results/scores.csv`; naive (t−1), seasonal naive (t−7), yearly naive (t−364) on validation 2023; zoom Jan–Apr 2023 | **Seasonal naive best: MAE 7.98, RMSE 10.74, MAPE 5.37 %** (= bar to beat); yearly naive 8.97 / 11.38 / 6.26 %; naive 9.30 / 12.98 / 6.60 %. Naive is one day late (fails Mon/Sat); seasonal naive fails the 2 weeks after New Year (copies Christmas lows), one week after Easter (echo spike) and when the weather turns |
+| 24 | Holt-Winters additive, s = 7, day-ahead (parameters estimated on train, then fixed and run through 2023); variants: no trend / trend / damped trend | **MAE 3.58, RMSE 5.28, MAPE 2.50 %** for all three (halves seasonal naive); α = 0.79 (level follows recent days), γ = 0.011 (weekly shape almost fixed), β ≈ 0 and damped φ 0.916 → trend useless → **keep no-trend variant**. Recovers within 1–2 days after New Year and Easter, but still misses the holiday day itself |
+| 25 | Residuals of HW on 2023 (ACF, Ljung-Box lags 7/14, top-10 errors); final test 2024–2025 after refit on 2009–2023 | Ljung-Box p = 0.0004 (lag 7), 0.014 (lag 14) → structure left; top-10 errors: 5 holidays over-predicted (Christmas −30.8, Easter Mon −24.5, Ascension −24.2, Whit Mon −20.6, Good Fri −19.9), 2 rebound days after them (+18.4, +16.0), 2 Jan (−13.6), Mon 31 Jul before 1 Aug (bridge, −13.4), one cold Sunday (+14.1 at 1.4 °C) → 9/10 calendar, 1 weather. **Test: HW MAE 4.05, RMSE 5.76, MAPE 2.85 %**; seasonal naive 7.75 / 10.85 / 5.24 %; yearly naive 7.56 / 10.39 / 5.12 %; naive 9.59 / 13.08 / 6.83 %. Refit parameters stable (α 0.795, γ 0.011) |
+
+---
+
 ## 8. Problems faced and how we solved them
 
 | # | Problem | Diagnosis | Solution |
@@ -398,6 +408,7 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 | 28 | Expected std to rise after adding d=1 (over-differencing check), but it fell (10.4 → 7.6) | Var of a first difference = 2σ²(1−ρ₁) < σ² when ρ₁ > 0.5; here ρ₁ ≈ 0.74 (weather spells persist) | Not a reason for d=1: ρ₁ = 0.74 is persistence, not a unit root → handled by an AR(1) term; ACF/PACF of d=1 show artificial negative correlations → d=1 rejected |
 | 29 | Christmas-period effect looked tiny (159.4 vs 162.2 GWh) | Seasonal confounding: Christmas days are in winter, the 162.2 average mixes all seasons; bridge days also overlap the period | Compared with Dec/Jan weekdays only, bridge days excluded → −28.5 GWh. Lesson: always compare like with like |
 | 30 | Fourier curve is the same every year (fit on 2009–2022 mean level) | Deterministic terms cannot follow a level shift → would over-predict 2023+ | Use Fourier only together with something that carries the level: D = 1 in SARIMAX, or lag / roll7 features in regression and LSTM |
+| 31 | Holt-Winters makes a second error the day after each holiday (+16 to +18 GWh) | α = 0.79: the holiday drags the level down, so the next normal day is under-predicted | A model without calendar knowledge pays twice per holiday → strong argument for exogenous holiday variables in SARIMAX |
 
 ---
 
@@ -428,10 +439,13 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 23. **Split:** train 2009–2022, validation 2023, test 2024–2025 (731 days), identical for all models.
 24. **Refit on 2009–2023** before forecasting the test period.
 25. **Level shift handling:** SARIMA / Holt-Winters adapt automatically; regression / LSTM get lag features (t−7, t−364) carrying the current level; 2023 validation used to detect over-prediction.
+31. **All model scores in one file:** `results/scores.csv` (model, period, MAE, RMSE, MAPE), appended by every modelling notebook → final comparison table.
+32. **Journal has one editor (Danyjoe)** to avoid merge conflicts.
 27. **Forecasting task = day-ahead** (tomorrow from data up to today), the same for all models; real-world task, fair comparison, lets temperature help. Limitation: observed (not forecast) temperature is used.
 28. **No leakage:** a feature is allowed only if known before the forecast day; rolling means of consumption end yesterday; feature choices (e.g. HDD base) made on train only.
 29. **HDD base temperature = 16.5 °C** (best R² on train; curve flat between 16 and 17 °C).
 30. **Feature dataset:** `dataset_features.csv` = dataset_daily + hdd, christmas_period, bridge_day, lag_1, lag_7, lag_364, roll7_mean (shifted, ends yesterday), hdd_lag1, sin/cos_1–4. NaN rows kept at the start; each model drops what it needs.
+33. **Holt-Winters variant = no trend** (additive, s = 7): trend and damped trend give identical scores with β ≈ 0 → simplest model kept (parsimony).
 26. **Collaboration:** GitHub repo, one branch per person, pull requests into `main`, one notebook per person at a time. Repo private until grading, then public (MIT license, data sources credited).
 
 ---
@@ -656,6 +670,9 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 | `figures/hdd_base_choice.png` | R² vs HDD base temperature (best 16.5 °C) |
 | `figures/fourier_yearly_fit.png` | Yearly cycle from 4 Fourier pairs (fit on train) |
 | `data/processed/dataset_features.csv` | **Feature dataset**, 6,209 × 22 (see decision 30) |
+| `notebooks/06_baselines_holtwinters.ipynb` | Baselines + Holt-Winters (section 4) |
+| `results/scores.csv` | All model scores (model, period, MAE, RMSE, MAPE) – appended by every modelling notebook |
+| `figures/baselines_val_zoom.png`, `figures/holtwinters_val_zoom.png`, `figures/holtwinters_residuals.png` | Section 4 figures |
 | `.gitignore`, `requirements.txt`, `LICENSE`, `GETTING_STARTED.md` | Repository files |
 
 ---
@@ -946,7 +963,7 @@ Data preparation, exploration and stationarity (sections 1–3) are **complete**
 - Fourier terms for the yearly cycle (sin/cos of 2πk·t/365.25, k = 1…K).
 - Save `data/processed/dataset_features.csv`.
 
-### Baselines + smoothing – `notebooks/06_baselines_holtwinters.ipynb` (Youssef, presentation section 4)
+### Baselines + smoothing – `notebooks/06_baselines_holtwinters.ipynb` (Danyjoe, presentation section 4 – taken over from Youssef on 21 Nov)
 1. Helper: split function + metrics function (MAE, RMSE, MAPE) reused by every model.
 2. Baselines on validation 2023: naive (y(t−1)), seasonal naive (y(t−7)), yearly naive (y(t−364)).
 3. Holt-Winters / ETS with weekly seasonality (s = 7), additive; compare variants (damped trend or not).
