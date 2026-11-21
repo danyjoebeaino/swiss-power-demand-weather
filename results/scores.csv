@@ -9,3 +9,14 @@ naive (yesterday),9.586,13.083,6.827,test 2024–2025
 seasonal naive (last week),7.745,10.846,5.243,test 2024–2025
 yearly naive (52 weeks ago),7.562,10.393,5.117,test 2024–2025
 Holt-Winters (no trend),4.054,5.76,2.847,test 2024–2025
+"SARIMA(1, 0, 0)(0,1,1)7",3.507,5.281,2.458,validation 2023
+"SARIMA(2, 0, 0)(0,1,1)7",3.529,5.267,2.467,validation 2023
+"SARIMA(1, 0, 1)(0,1,1)7",3.539,5.254,2.47,validation 2023
+"SARIMA(1, 1, 1)(0,1,1)7",3.563,5.258,2.48,validation 2023
+SARIMAX + calendar,2.955,3.91,2.041,validation 2023
+SARIMAX + calendar + Fourier,2.933,3.805,2.027,validation 2023
+SARIMAX + calendar + Fourier + HDD,2.376,3.099,1.668,validation 2023
+"SARIMA(1, 0, 0)(0,1,1)7",3.927,5.696,2.768,test 2024–2025
+SARIMAX + calendar,3.287,4.249,2.277,test 2024–2025
+SARIMAX + calendar + Fourier,3.169,4.115,2.192,test 2024–2025
+SARIMAX + calendar + Fourier + HDD,2.505,3.261,1.754,test 2024–2025
