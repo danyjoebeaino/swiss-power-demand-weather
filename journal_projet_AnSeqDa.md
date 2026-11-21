@@ -1,6 +1,6 @@
 # Project log – AnSeqDa (Analysis of Sequential Data)
 
-*Record of everything decided, done and found so far. Last update: 21 November 2026 – section 5 COMPLETE: SARIMAX + calendar + Fourier + HDD test MAE 2.51 GWh / 1.75 %; temperature cuts error by 21 % (14 % with 1 °C forecast error); next = LSTM (section 6) and comparison; feature engineering COMPLETE: `dataset_features.csv` saved (6,209 × 22); HDD base = 16.5 °C; forecasting task fixed = day-ahead; Youssef takes baselines + Holt-Winters.*
+*Record of everything decided, done and found so far. Last update: 22 November 2026 – section 6 COMPLETE (LSTM ensemble test MAE 3.19, behind SARIMAX + HDD 2.50); next = section 7 comparison + report; section 5: SARIMAX + calendar + Fourier + HDD test MAE 2.51 GWh / 1.75 %; temperature cuts error by 21 % (14 % with 1 °C forecast error); next = LSTM (section 6) and comparison; feature engineering COMPLETE: `dataset_features.csv` saved (6,209 × 22); HDD base = 16.5 °C; forecasting task fixed = day-ahead; Youssef takes baselines + Holt-Winters.*
 
 ---
 
@@ -15,8 +15,8 @@
 | – Feature engineering | ✅ complete (21 Nov) | `05_features.ipynb` → `dataset_features.csv` |
 | 4. Smoothing (Holt-Winters) + baselines | ✅ complete (21 Nov) – HW test MAE 4.05 GWh (2.85 %) | `06_baselines_holtwinters.ipynb` |
 | 5. ARIMA (SARIMA / SARIMAX) | ✅ complete (21 Nov) – best model test MAE 2.51 GWh (1.75 %) | `07_sarima.ipynb` |
-| 6. LSTM | ⏭ next (owner to agree – suggested Youssef) | `08_lstm.ipynb` (to create) |
-| 7. Comparison & conclusion | ⬜ | – |
+| 6. LSTM | ✅ complete (22 Nov) – ensemble test MAE 3.19 (does not beat SARIMAX + HDD 2.50) | `08_lstm.ipynb` |
+| 7. Comparison & conclusion | ⏭ next – leaderboard ready in `results/scores.csv` | `09_comparison.ipynb` (to create) |
 
 ### Team and repository
 - GitHub repo: **https://github.com/danyjoebeaino/swiss-power-demand-weather** (MIT license; private until grading, then public for portfolio).
@@ -385,6 +385,30 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 
 ---
 
+## 7h. LSTM (notebook `08_lstm.ipynb`, from 22 November, Danyjoe)
+
+| Lesson | What we did | Result |
+|---|---|---|
+| 30 | PyTorch (CPU) installed; weekday-only calendar vars as in SARIMAX; target `d7` = y − y(t−7); scaling on train only (d7 ÷ 10.33 GWh, hdd ÷ 26.9); windows: 28 past days × 5 features + 19 day-t features (hdd, 3 calendar, 7 weekday dummies, 8 Fourier) | train 5,078 samples (first 35 days of 2009 lack history), validation 365, test 731 – every day forecast |
+| 31 | `DayAheadLSTM` (LSTM 32 units over 28-day window + dense head 32 ReLU on [summary, day-t features]; 6,689 parameters); Adam lr 1e-3, batch 64, MSE, early stopping on 2023 (patience 10), seed 42 | Stopped after 67 epochs, best epoch 57; smooth curves, train MSE ≈ 0.07 vs validation ≈ 0.115 (moderate gap, validation flat from ~epoch 40). **Validation MAE 2.68, RMSE 3.41, MAPE 1.87 %** – better than HW (3.58) and SARIMAX without temperature (2.93), behind SARIMAX + HDD (2.38). Slightly optimistic (2023 used for early stopping) |
+| 32 | 5 seeds with early stopping on 2023 → ensemble (mean of 5 forecasts); test: each seed retrained on 2009–2023 for its best epoch count (43–66), ensemble scored on 2024–2025; leaderboard from `results/scores.csv` | Validation: single seeds MAE 2.79 ± 0.04, **ensemble 2.71 / 3.42 / 1.89 %**. **Test: single seeds 3.27 ± 0.04, ensemble 3.19 / 4.03 / 2.20 %** → beats Holt-Winters (4.05, −21 %) and SARIMA (3.93), ties SARIMAX without temperature (3.17), **27 % worse than SARIMAX + HDD (2.50)**. Larger val→test drop than SARIMAX (+18 % vs +5 %): early-stopping optimism + weaker generalisation |
+
+### Final test leaderboard (2024–2025, day-ahead)
+| Model | MAE | RMSE | MAPE |
+|---|---|---|---|
+| **SARIMAX + calendar + Fourier + HDD** | **2.50** | **3.26** | **1.75 %** |
+| SARIMAX + calendar + Fourier | 3.17 | 4.12 | 2.19 % |
+| LSTM (ensemble of 5 seeds) | 3.19 | 4.03 | 2.20 % |
+| SARIMAX + calendar | 3.29 | 4.25 | 2.28 % |
+| SARIMA(1,0,0)(0,1,1)₇ | 3.93 | 5.70 | 2.77 % |
+| Holt-Winters (no trend) | 4.05 | 5.76 | 2.85 % |
+| Yearly naive | 7.56 | 10.39 | 5.12 % |
+| Seasonal naive | 7.74 | 10.85 | 5.24 % |
+| Naive | 9.59 | 13.08 | 6.83 % |
+(2.50 vs 2.51 and 7.74 vs 7.75 elsewhere = rounding of the 3-decimal values in scores.csv.)
+
+---
+
 ## 8. Problems faced and how we solved them
 
 | # | Problem | Diagnosis | Solution |
@@ -419,6 +443,7 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 | 28 | Expected std to rise after adding d=1 (over-differencing check), but it fell (10.4 → 7.6) | Var of a first difference = 2σ²(1−ρ₁) < σ² when ρ₁ > 0.5; here ρ₁ ≈ 0.74 (weather spells persist) | Not a reason for d=1: ρ₁ = 0.74 is persistence, not a unit root → handled by an AR(1) term; ACF/PACF of d=1 show artificial negative correlations → d=1 rejected |
 | 29 | Christmas-period effect looked tiny (159.4 vs 162.2 GWh) | Seasonal confounding: Christmas days are in winter, the 162.2 average mixes all seasons; bridge days also overlap the period | Compared with Dec/Jan weekdays only, bridge days excluded → −28.5 GWh. Lesson: always compare like with like |
 | 30 | Fourier curve is the same every year (fit on 2009–2022 mean level) | Deterministic terms cannot follow a level shift → would over-predict 2023+ | Use Fourier only together with something that carries the level: D = 1 in SARIMAX, or lag / roll7 features in regression and LSTM |
+| 35 | LSTM with temperature only ties SARIMAX without temperature on the test | Simple, additive, near-linear structure (fixed weekly shape, holiday shifts, linear HDD) is built into SARIMAX but must be learned by the LSTM from ~5,000 samples; early stopping on 2023 flatters validation | Report honestly: more complex ≠ better here. Optional checks: LSTM without HDD (does it use temperature?), hybrid SARIMAX + LSTM on residuals as further work |
 | 34 | With simulated 2 °C forecast errors the HDD model is worse than the model without temperature | Model trained on exact temperatures trusts HDD fully (errors-in-variables); single noise draw, independent errors (real forecast errors are smaller for a 4-station daily mean and correlated) | Report the 21 % gain as an upper bound; state that it holds for ~1 °C forecasts. Extension: train/test with archived MeteoSwiss forecasts, or train on noisy temperature |
 | 33 | SARIMAX coefficients smaller than hand-measured effects (Christmas −10.5 vs −28.5; bridge −8.6 vs −22) | Coefficients are *extra* effects given the rest of the model: 26 Dec / 2 Jan are partly covered by `holiday_wd` (holiday_share > 0), the very persistent error (AR 0.98) absorbs multi-day lows, and the hand bridge-day figure compared May days with an all-year average (season confounding) | Interpret coefficients as conditional effects, not raw averages; judge variables by forecast gain |
 | 32 | AIC prefers richer SARIMA models ((1,0,1) −90 vs (1,0,0)) but validation MAE does not improve | 5,113 training days: small in-sample likelihood gains become 'significant' for AIC without changing one-step forecasts | Choose on validation error (the forecasting task), keep the simplest model; report both |
@@ -461,6 +486,7 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 30. **Feature dataset:** `dataset_features.csv` = dataset_daily + hdd, christmas_period, bridge_day, lag_1, lag_7, lag_364, roll7_mean (shifted, ends yesterday), hdd_lag1, sin/cos_1–4. NaN rows kept at the start; each model drops what it needs.
 34. **SARIMA order = (1,0,0)(0,1,1)₇** (best validation MAE 3.51; matches lesson 18; simplest). Exogenous variables enter on weekdays only (a holiday on a Sunday changes nothing).
 33. **Holt-Winters variant = no trend** (additive, s = 7): trend and damped trend give identical scores with β ≈ 0 → simplest model kept (parsimony).
+35. **LSTM design (22 Nov):** PyTorch (CPU); day-ahead; **target = weekly difference y(t) − y(t−7)** (same idea as D = 1 → immune to the 2022–23 level shift), forecast = y(t−7) + prediction; two inputs: (a) window of the past 28 days [weekly diff, hdd, holiday_wd, christmas_wd, bridge_day] → LSTM, (b) known features of day t [hdd, calendar, weekday one-hot, Fourier] → dense; scaling fitted on train only; same split, metrics and `results/scores.csv`.
 26. **Collaboration:** GitHub repo, one branch per person, pull requests into `main`, one notebook per person at a time. Repo private until grading, then public (MIT license, data sources credited).
 
 ---
@@ -688,6 +714,8 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 | `notebooks/06_baselines_holtwinters.ipynb` | Baselines + Holt-Winters (section 4) |
 | `notebooks/07_sarima.ipynb` | SARIMA / SARIMAX (section 5) |
 | `figures/sarimax_hdd_winter_zoom.png` | Test winter 2024–25, with vs without temperature |
+| `notebooks/08_lstm.ipynb` | LSTM (section 6) |
+| `figures/lstm_training_curves.png` | LSTM train / validation loss |
 | `results/scores.csv` | All model scores (model, period, MAE, RMSE, MAPE) – appended by every modelling notebook |
 | `figures/baselines_val_zoom.png`, `figures/holtwinters_val_zoom.png`, `figures/holtwinters_residuals.png` | Section 4 figures |
 | `.gitignore`, `requirements.txt`, `LICENSE`, `GETTING_STARTED.md` | Repository files |
@@ -1007,6 +1035,7 @@ SARIMA(1,0,0)(0,1,1)₇ + neighbours (AIC) → + Fourier terms → SARIMAX (HDD 
 - Residual vs temperature anomaly r = −0.56 (after removing confounders; raw −0.19).
 - Risk for the test period: 2022–23 level shift (−9 GWh/day, ~8 structural) and how each model family handles it.
 - Suggested figures for section 2: consumption vs temperature, yearly consumption/temperature, weekday profile, monthly boxplot, MSTL decomposition, residual vs temperature anomaly.
+- **Section 6 sentence:** *"The LSTM (5-seed ensemble, with calendar and temperature) reaches 3.19 GWh on 2024–25: better than Holt-Winters and plain SARIMA, but 27 % behind SARIMAX with HDD. With a few thousand days of clearly structured data, the well-specified statistical model wins."*
 - **Key result sentence:** *"On 2024–2025, day-ahead, the best model (SARIMAX with calendar, Fourier and HDD) reaches MAE 2.51 GWh (1.75 %), half the error of Holt-Winters (4.05) and a third of seasonal naive (7.75). Adding temperature alone cuts the error by 21 % (3.17 → 2.51): the weather matters."* (Caveat: observed, not forecast, temperature – with ~1 °C forecast error the gain is still 14 %, with 2 °C it disappears; lesson 29.)
 - **Section 3 key sentence:** *"ADF rejects a unit root (p < 0.001), but KPSS rejects stationarity (p = 0.018): the series is mean-reverting around a seasonal level that is not constant. One weekly difference makes it stationary (both tests agree); its ACF/PACF point to SARIMA(1,0,0)(0,1,1)₇, and the yearly cycle is left to Fourier terms."*
 - Suggested figures for section 3: rolling mean/std, ACF/PACF raw, differencing, ACF/PACF differenced, stationarity test table, split figure.
