@@ -1,6 +1,6 @@
 # Project log – AnSeqDa (Analysis of Sequential Data)
 
-*Record of everything decided, done and found so far. Last update: 17 November 2026 – section 3 (autocorrelation & stationarity) complete; GitHub repo set up and shared with the team; next = feature engineering (colleague) and baselines / Holt-Winters (section 4).*
+*Record of everything decided, done and found so far. Last update: 21 November 2026 – feature engineering COMPLETE (Danyjoe): `dataset_features.csv` saved (6,209 × 22); HDD base = 16.5 °C; forecasting task fixed = day-ahead; Youssef takes baselines + Holt-Winters.*
 
 ---
 
@@ -12,15 +12,15 @@
 | 1. Data presentation | ✅ material ready (sources, cleaning, problems solved) | `01_cleaning.ipynb`, `02_temperature.ipynb` |
 | 2. Exploration | ✅ complete | `03_exploration.ipynb` |
 | 3. Autocorrelation & stationarity | ✅ complete (17 Nov) | `04_stationarity.ipynb` |
-| – Feature engineering | ⏭ **in progress – colleague** (branch `joe`) | `05_features.ipynb` (to create) |
-| 4. Smoothing (Holt-Winters) + baselines | ⏭ **next – Danyjoe** | `06_baselines_holtwinters.ipynb` (to create) |
-| 5. ARIMA (SARIMA / SARIMAX) | ⬜ | – |
+| – Feature engineering | ✅ complete (21 Nov) | `05_features.ipynb` → `dataset_features.csv` |
+| 4. Smoothing (Holt-Winters) + baselines | ⏭ **next – Youssef** (branch `joe`) | `06_baselines_holtwinters.ipynb` (to create) |
+| 5. ARIMA (SARIMA / SARIMAX) | ⏭ **next – Danyjoe** | `07_sarima.ipynb` (to create) |
 | 6. LSTM | ⬜ | – |
 | 7. Comparison & conclusion | ⬜ | – |
 
 ### Team and repository
 - GitHub repo: **https://github.com/danyjoebeaino/swiss-power-demand-weather** (MIT license; private until grading, then public for portfolio).
-- Branches: `main` (shared, stable), `joe` (colleague), `danyjoe` (Danyjoe). Work on your own branch → pull request into `main`.
+- Branches: `main` (shared, stable), `joe` (Youssef), `danyjoe` (Danyjoe). Work on your own branch → pull request into `main`.
 - Rule: **never edit the same notebook at the same time** (notebooks don't merge).
 - Onboarding guide for the colleague: `GETTING_STARTED.md` (setup, data, next steps, Git usage).
 - Not in the repo (`.gitignore`): `data/raw/`, `.venv/`, `.ipynb_checkpoints/`, caches, archives.
@@ -38,11 +38,12 @@
 4. **Structural break 2022–23:** train mean 155.3 GWh/day vs test 146.2 (≈ −9 GWh, −6 %); only ~1 GWh explained by temperature → ~8 GWh structural. **Decided handling (section 9, decisions 23–25):** SARIMA with D = 1 absorbs the level; level-based models get lag features (t−7, t−364); all final models refit on 2009–2023 before the test.
 5. **Stationarity:** raw series not stationary in mean (KPSS); weekly difference (D = 1, s = 7) is enough; variance stable → no log transform. **Candidate model: SARIMA(1,0,0)(0,1,1)₇** + Fourier terms (yearly) + exogenous holidays/HDD.
 6. **Yearly lag = 364 days (52 × 7, same weekday), not 365.**
-7. **Open feature-engineering items:** HDD base temperature (~16–18 °C), Christmas-period variable (confirmed again by 30-day std spikes), bridge days.
+7. **HDD base = 16.5 °C** (chosen on train, R² = 0.916; slope ≈ 2.95 GWh per HDD). Christmas-period and bridge-day variables built (bridge day ≈ a Saturday, −22 GWh; Christmas-period weekday −28.5 GWh vs other winter weekdays). Lags, 7-day rolling mean (ending yesterday), yesterday's HDD and 4 Fourier pairs built; all saved in `data/processed/dataset_features.csv`.
+8. **Forecasting task = day-ahead:** predict tomorrow with data up to today; evaluated over all of 2023 (validation) and 2024–2025 (test). **No leakage:** only inputs known before the forecast day (calendar, temperature of the day, consumption lags; rolling means must end yesterday).
 
 ### Immediate next steps
-- Colleague: `05_features.ipynb` (HDD, Christmas period, bridge days, lags t−1/t−7/t−364) → `data/processed/dataset_features.csv`.
-- Danyjoe: baselines (naive, seasonal naive) + Holt-Winters on the agreed split → plan in section 14.
+- Danyjoe: commit + PR `05_features.ipynb` and `dataset_features.csv` into `main`; then `07_sarima.ipynb` (SARIMA(1,0,0)(0,1,1)₇ + neighbours by AIC → + Fourier → SARIMAX with HDD, holidays, Christmas period, bridge days).
+- Youssef: `06_baselines_holtwinters.ipynb` (naive, seasonal naive, yearly naive t−364, then Holt-Winters) → plan in section 14.
 
 ---
 
@@ -353,6 +354,16 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 
 ---
 
+## 7e. Feature engineering steps (notebook `05_features.ipynb`, from 21 November)
+
+| Lesson | What we did | Result |
+|---|---|---|
+| 20 | HDD base scan 12–22 °C: regression consumption ~ weekday dummies + HDD, train 2009–2022, holidays excluded (4,987 days) | Best base **16.5 °C** (R² 0.9162); flat top 16–17 °C (0.9161–0.9157); slope 2.95 GWh per HDD (≈ the −3 GWh/°C seen in notebook 02) |
+| 21 | Calendar features: `christmas_period` (24 Dec – 2 Jan) and `bridge_day` (non-holiday weekday between a holiday and an off day) | 170 Christmas days (10/year); 36 bridge days (~2/year: Fri after Ascension, 2 Jan, 31 Oct/2 Nov around All Saints, 2 Aug, 24/27/31 Dec); bridge day **139.8 GWh ≈ Saturday (140.3)** vs normal weekday 162.2; Christmas-period weekday 159.4 (raw, season-confounded) → **fair winter check: 159.9 vs 188.4 for other Dec/Jan weekdays = −28.5 GWh (−15 %)** |
+| 22 | Lags (t−1, t−7, t−364), 7-day rolling mean ending yesterday, `hdd_lag1`, Fourier pairs k = 1–4 (period 365.25); Fourier-only fit on train; saved `dataset_features.csv` | NaN only at the start (364 for lag_364, 7 for lag_7/roll7, 1 for lag_1/hdd_lag1); Fourier fit follows the yearly wave (~182 winter peak, ~133 summer trough) and even a small Christmas notch; misses weekdays, holidays, cold spells and the 2022–23 level drop (by design); final file 6,209 × 22 |
+
+---
+
 ## 8. Problems faced and how we solved them
 
 | # | Problem | Diagnosis | Solution |
@@ -374,7 +385,7 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 | 15 | Geneva file is half the size of the others | Shorter measurement history (starts later) | Checked completeness for 2009–2025: 0 missing → no problem for our period |
 | 16 | `holidays.Switzerland()` without a canton gives only 4 holidays/year (New Year, Ascension, 1 August, Christmas) | In Switzerland most holidays are set by each **canton** (Good Friday, Easter Monday, Whit Monday, 26 Dec missing) | Counted for each day in how many of the 26 cantons it is a holiday → `holiday_share`; `is_holiday` = share ≥ 0.5 |
 | 17 | `holidays.Switzerland.subdivisions` also contains "Stadt Zurich" | Not a canton | Kept only 2-letter codes (`len(c) == 2`) → 26 cantons |
-| 18 | 24 Dec, 31 Dec and the Christmas–New Year period are not official holidays but consumption is low (companies closed) | Not captured by the holiday variable; confirmed again by the yearly 30-day std spikes (lesson 14) | **Open** – feature engineering (colleague): "Christmas period" variable (24 Dec – 2 Jan) and bridge days (Friday after Ascension) |
+| 18 | 24 Dec, 31 Dec and the Christmas–New Year period are not official holidays but consumption is low (companies closed) | Not captured by the holiday variable; confirmed again by the yearly 30-day std spikes (lesson 14) | **Solved (21 Nov, lesson 21)** – `christmas_period` (24 Dec – 2 Jan, −28.5 GWh vs other winter weekdays) and `bridge_day` (≈ a Saturday) |
 | 19 | Consumption vs temperature is not linear (flat above ~18 °C) | Heating stops above ~16–18 °C; a straight line would under-predict summer | **Planned** – heating degree days HDD = max(0, T_base − T) |
 | 20 | Residual vs temperature correlation looked weak (−0.19) | Two confounders: holidays dominate the residual (±30 GWh), and the yearly cycle already contains the *normal* seasonal temperature | Excluded holidays and used the **temperature anomaly** (temp − normal for that day of year) → −0.559 |
 | 21 | Consumption level dropped in 2022–23 and stayed low; test period (2024–25) is below most training data | Structural break (energy crisis, saving campaign, possibly rooftop solar); quantified in lesson 19: −9 GWh/day, ~8 structural | **Decided (17 Nov)** – keep split; SARIMA (D=1) absorbs the level; level-based models get lag features (t−7, t−364); refit on 2009–2023 before test; 2023 validation detects over-prediction |
@@ -385,6 +396,8 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 | 26 | First `git push` rejected ("fetch first") | GitHub repo created with an MIT LICENSE → remote not empty | `git pull origin main --allow-unrelated-histories --no-rebase`, then push |
 | 27 | `FutureWarning` from `adfuller` (return type will change in statsmodels 0.16) | API change announced | Add `result_object=False` to the `adfuller(...)` call |
 | 28 | Expected std to rise after adding d=1 (over-differencing check), but it fell (10.4 → 7.6) | Var of a first difference = 2σ²(1−ρ₁) < σ² when ρ₁ > 0.5; here ρ₁ ≈ 0.74 (weather spells persist) | Not a reason for d=1: ρ₁ = 0.74 is persistence, not a unit root → handled by an AR(1) term; ACF/PACF of d=1 show artificial negative correlations → d=1 rejected |
+| 29 | Christmas-period effect looked tiny (159.4 vs 162.2 GWh) | Seasonal confounding: Christmas days are in winter, the 162.2 average mixes all seasons; bridge days also overlap the period | Compared with Dec/Jan weekdays only, bridge days excluded → −28.5 GWh. Lesson: always compare like with like |
+| 30 | Fourier curve is the same every year (fit on 2009–2022 mean level) | Deterministic terms cannot follow a level shift → would over-predict 2023+ | Use Fourier only together with something that carries the level: D = 1 in SARIMAX, or lag / roll7 features in regression and LSTM |
 
 ---
 
@@ -415,6 +428,10 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 23. **Split:** train 2009–2022, validation 2023, test 2024–2025 (731 days), identical for all models.
 24. **Refit on 2009–2023** before forecasting the test period.
 25. **Level shift handling:** SARIMA / Holt-Winters adapt automatically; regression / LSTM get lag features (t−7, t−364) carrying the current level; 2023 validation used to detect over-prediction.
+27. **Forecasting task = day-ahead** (tomorrow from data up to today), the same for all models; real-world task, fair comparison, lets temperature help. Limitation: observed (not forecast) temperature is used.
+28. **No leakage:** a feature is allowed only if known before the forecast day; rolling means of consumption end yesterday; feature choices (e.g. HDD base) made on train only.
+29. **HDD base temperature = 16.5 °C** (best R² on train; curve flat between 16 and 17 °C).
+30. **Feature dataset:** `dataset_features.csv` = dataset_daily + hdd, christmas_period, bridge_day, lag_1, lag_7, lag_364, roll7_mean (shifted, ends yesterday), hdd_lag1, sin/cos_1–4. NaN rows kept at the start; each model drops what it needs.
 26. **Collaboration:** GitHub repo, one branch per person, pull requests into `main`, one notebook per person at a time. Repo private until grading, then public (MIT license, data sources credited).
 
 ---
@@ -635,6 +652,10 @@ New Year 1.00 · Good Friday 0.88 · Easter Monday 0.73 · Ascension 1.00 · Whi
 | `figures/differencing.png` | Raw, weekly difference, weekly + first difference |
 | `figures/acf_pacf_differenced.png` | ACF/PACF of the two differenced series (lags 42) |
 | `figures/train_val_test_split.png` | Split with 365-day mean |
+| `notebooks/05_features.ipynb` | Feature engineering notebook |
+| `figures/hdd_base_choice.png` | R² vs HDD base temperature (best 16.5 °C) |
+| `figures/fourier_yearly_fit.png` | Yearly cycle from 4 Fourier pairs (fit on train) |
+| `data/processed/dataset_features.csv` | **Feature dataset**, 6,209 × 22 (see decision 30) |
 | `.gitignore`, `requirements.txt`, `LICENSE`, `GETTING_STARTED.md` | Repository files |
 
 ---
@@ -917,7 +938,7 @@ print(summary)
 
 Data preparation, exploration and stationarity (sections 1–3) are **complete**. Next:
 
-### Feature engineering – `notebooks/05_features.ipynb` (colleague, branch `joe`)
+### Feature engineering – `notebooks/05_features.ipynb` ✅ (Danyjoe, 21 Nov – done; items below all built)
 - HDD = max(0, T_base − T): choose T_base (~16–18 °C) from the consumption-vs-temperature scatter (try 16, 17, 18; pick the best fit on train).
 - Possibly CDD = max(0, T − T_cool) for the small summer cooling effect (> ~22 °C).
 - Christmas-period variable (24 Dec – 2 Jan), bridge days (Friday after Ascension, Monday/Friday next to holidays).
@@ -925,7 +946,7 @@ Data preparation, exploration and stationarity (sections 1–3) are **complete**
 - Fourier terms for the yearly cycle (sin/cos of 2πk·t/365.25, k = 1…K).
 - Save `data/processed/dataset_features.csv`.
 
-### Baselines + smoothing – `notebooks/06_baselines_holtwinters.ipynb` (Danyjoe, presentation section 4)
+### Baselines + smoothing – `notebooks/06_baselines_holtwinters.ipynb` (Youssef, presentation section 4)
 1. Helper: split function + metrics function (MAE, RMSE, MAPE) reused by every model.
 2. Baselines on validation 2023: naive (y(t−1)), seasonal naive (y(t−7)), yearly naive (y(t−364)).
 3. Holt-Winters / ETS with weekly seasonality (s = 7), additive; compare variants (damped trend or not).
